@@ -16,6 +16,13 @@ export async function setupDatabase() {
   // Ansluter till databasen
   await pool.connect();
 
+  // VIKTIGT: lösenord skall egentligen ALDRIG sparas i ren text. Använd hashing.
+  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL,
+    password TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+
   // Skapar posts-tabellen om den inte redan finns (IF NOT EXISTS)
   // SERIAL PRIMARY KEY = id ökar automatiskt för varje ny post
   // NOT NULL = fältet måste ha ett värde
@@ -25,6 +32,14 @@ export async function setupDatabase() {
     title TEXT NOT NULL,
     content TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    author TEXT NOT NULL,
-    likes INT NOT NULL DEFAULT 0)`);
+    likes INT NOT NULL DEFAULT 0,
+    author_id INT REFERENCES users(id))`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS comments (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    likes INT NOT NULL DEFAULT 0,
+    author_id INT REFERENCES users(id),
+    post_id INT REFERENCES posts(id))`);
 }

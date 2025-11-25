@@ -2,14 +2,14 @@ import { pool } from "../config/database.mjs";
 
 // Skapar ett nytt blogginlägg i databasen
 // Tar emot title, content och author som parametrar
-export async function createBlogPost(title, content, author) {
+export async function createBlogPost(title, content, authorId) {
   // Kör en INSERT-query mot databasen
   // $1, $2, $3 är placeholders som ersätts av värdena i arrayen
   // Detta skyddar mot SQL-injection!
   // RETURNING * gör att vi får tillbaka den skapade raden
   const result = await pool.query(
-    "INSERT INTO posts (title, content, author) VALUES ($1, $2, $3) RETURNING *",
-    [title, content, author]
+    "INSERT INTO posts (title, content, author_id) VALUES ($1, $2, $3) RETURNING *",
+    [title, content, authorId]
   );
 
   // Kollar att exakt 1 rad skapades
@@ -24,7 +24,40 @@ export async function createBlogPost(title, content, author) {
 // Hämtar alla blogginlägg från databasen
 export async function getAllBlogPosts() {
   // SELECT * hämtar alla kolumner, FROM posts betyder från posts-tabellen
-  const result = await pool.query("SELECT * FROM posts");
+  const result = await pool.query(
+    `SELECT 
+      posts.id, 
+      posts.title, 
+      posts.content, 
+      posts.created_at, 
+      posts.likes,
+      users.username,
+      users.id AS author_id
+    FROM posts LEFT JOIN users ON posts.author_id = users.id`
+  );
+
+  if (!result.rows) {
+    throw new Error("Failed to get blogposts");
+  }
+
+  // Returnerar en array med alla inlägg
+  return result.rows;
+}
+
+// Hämtar alla blogginlägg från databasen
+export async function getBlogPostByAuthor(authorId) {
+  const result = await pool.query(
+    `SELECT 
+      posts.id, 
+      posts.title, 
+      posts.content, 
+      posts.created_at, 
+      posts.likes,
+      users.username,
+      users.id AS author_id
+    FROM posts LEFT JOIN users ON posts.author_id = users.id WHERE author_id = $1`,
+    [authorId]
+  );
 
   if (!result.rows) {
     throw new Error("Failed to get blogposts");
@@ -46,8 +79,23 @@ export async function getBlogPostById(postId) {
     return null;
   }
 
+  const comments = await pool.query(
+    `SELECT
+      comments.id,
+      comments.content,
+      comments.created_at,
+      comments.likes,
+      users.username,
+      users.id AS author_id
+    FROM comments LEFT JOIN users ON comments.author_id = users.id WHERE post_id = $1`,
+    [postId]
+  );
+
+  const post = result.rows[0];
+  post.comments = comments.rows;
+
   // Returnerar det första (och enda) inlägget
-  return result.rows[0];
+  return post;
 }
 
 // Söker efter blogginlägg vars titel innehåller en viss text
@@ -69,21 +117,24 @@ export async function getBlogPostsByTitle(title) {
 }
 
 // Raderar ett blogginlägg baserat på id
-export async function deleteBlogPostById(postId) {
+export async function deleteBlogPostById(postId, authorId) {
   // DELETE tar bort raden från tabellen
-  const result = await pool.query("DELETE FROM posts WHERE id = $1", [postId]);
+  const result = await pool.query(
+    "DELETE FROM posts WHERE id = $1 AND author_id = $2",
+    [postId, authorId]
+  );
 
   // Returnerar true om minst 1 rad raderades, annars false
   return result.rowCount > 0;
 }
 
 // Uppdaterar alla fält på ett blogginlägg
-export async function updateBlogPostById(postId, title, content, author) {
+export async function updateBlogPostById(postId, authorId, title, content) {
   // UPDATE ändrar befintliga rader
   // SET anger vilka kolumner som ska uppdateras och till vilka värden
   const result = await pool.query(
-    "UPDATE posts SET title = $1, content = $2, author = $3 WHERE id = $4",
-    [title, content, author, postId]
+    "UPDATE posts SET title = $1, content = $2 WHERE id = $3 AND author_id = $4",
+    [title, content, postId, authorId]
   );
 
   // Returnerar true om minst 1 rad uppdaterades
@@ -91,12 +142,12 @@ export async function updateBlogPostById(postId, title, content, author) {
 }
 
 // Uppdaterar bara titeln på ett blogginlägg
-export async function updateBlogPostTitleById(postId, title) {
+export async function updateBlogPostTitleById(postId, authorId, title) {
   // Här uppdaterar vi bara title-kolumnen, resten förblir oförändrat
-  const result = await pool.query("UPDATE posts SET title = $1 WHERE id = $2", [
-    title,
-    postId,
-  ]);
+  const result = await pool.query(
+    "UPDATE posts SET title = $1 WHERE id = $2 AND author_id = $3",
+    [title, postId, authorId]
+  );
 
   return result.rowCount > 0;
 }

@@ -1,22 +1,18 @@
 meta {
-  name: Delete Blog Post By Id
+  name: Get Blog Post By Author
   type: http
-  seq: 5
+  seq: 12
 }
 
-delete {
-  url: http://localhost:3000/api/blogs/:postId
+get {
+  url: http://localhost:3000/api/blogs/self
   body: none
   auth: inherit
 }
 
-params:path {
-  postId: 1
-}
-
 headers {
-  username: TonyStark
-  password: ironman
+  username: Bruce
+  password: batman123
 }
 
 body:json {

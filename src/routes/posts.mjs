@@ -5,12 +5,14 @@ import {
   deleteBlogPostById,
   dislikeBlogPostById,
   getAllBlogPosts,
+  getBlogPostByAuthor,
   getBlogPostById,
   getBlogPostsByTitle,
   likeBlogPostById,
   updateBlogPostById,
   updateBlogPostTitleById,
 } from "../repositories/posts.mjs";
+import { loginUser } from "../repositories/users.mjs";
 
 // Skapar en router som vi kan definiera våra endpoints på
 // En router är som en mini-app inom vår huvudapp
@@ -20,6 +22,14 @@ const router = express.Router();
 // req (request) innehåller data från klienten
 // res (response) används för att skicka tillbaka data till klienten
 router.post("/blogs", async (req, res) => {
+  const user = await loginUser(req.headers.username, req.headers.password);
+  if (!user) {
+    res.status(401).json({
+      error: "The username or password is incorrect",
+    });
+    return;
+  }
+
   // Först kollar vi att requesten har en body (JSON-data)
   if (!req.body) {
     res.status(400).json({
@@ -28,10 +38,9 @@ router.post("/blogs", async (req, res) => {
     return;
   }
 
-  // Plockar ut title, content och author från request body
+  // Plockar ut title och content från request body
   const title = req.body.title;
   const content = req.body.content;
-  const author = req.body.author;
 
   // Validerar att title är en sträng och inte undefined/null
   if (!validateString(title)) {
@@ -49,17 +58,9 @@ router.post("/blogs", async (req, res) => {
     return;
   }
 
-  // Validerar author också
-  if (!validateString(author)) {
-    res.status(400).json({
-      error: "Author must be included and be a string",
-    });
-    return;
-  }
-
   // Om allt är okej, försöker vi skapa inlägget i databasen
   try {
-    const post = await createBlogPost(title, content, author);
+    const post = await createBlogPost(title, content, user.id);
     // Status 201 = Created (framgångsrikt skapat)
     res.status(201).json(post);
   } catch (error) {
@@ -74,6 +75,19 @@ router.post("/blogs", async (req, res) => {
 // Denna endpoint är enkel - vi hämtar alla posts och skickar tillbaka dem
 router.get("/blogs", async (req, res) => {
   const posts = await getAllBlogPosts();
+  res.json(posts); // Status 200 är default för res.json()
+});
+
+router.get("/blogs/self", async (req, res) => {
+  const user = await loginUser(req.headers.username, req.headers.password);
+  if (!user) {
+    res.status(401).json({
+      error: "The username or password is incorrect",
+    });
+    return;
+  }
+
+  const posts = await getBlogPostByAuthor(user.id);
   res.json(posts); // Status 200 är default för res.json()
 });
 
@@ -122,6 +136,14 @@ router.get("/blogs/:id", async (req, res) => {
 // DELETE /api/blogs/:id - Raderar ett blogginlägg
 // Tar bort inlägget helt från databasen
 router.delete("/blogs/:id", async (req, res) => {
+  const user = await loginUser(req.headers.username, req.headers.password);
+  if (!user) {
+    res.status(401).json({
+      error: "The username or password is incorrect",
+    });
+    return;
+  }
+
   const postId = Number.parseInt(req.params.id);
 
   if (!validateNumber(postId)) {
@@ -130,7 +152,7 @@ router.delete("/blogs/:id", async (req, res) => {
   }
 
   // Försöker radera posten - får tillbaka true/false
-  const deleted = await deleteBlogPostById(postId);
+  const deleted = await deleteBlogPostById(postId, user.id);
 
   // Om inlägget inte finns, returnera 404
   if (!deleted) {
@@ -148,6 +170,14 @@ router.delete("/blogs/:id", async (req, res) => {
 // PUT används när vi vill uppdatera ALLA fält (title, content, author)
 // Jämför med PATCH som bara uppdaterar vissa fält
 router.put("/blogs/:id", async (req, res) => {
+  const user = await loginUser(req.headers.username, req.headers.password);
+  if (!user) {
+    res.status(401).json({
+      error: "The username or password is incorrect",
+    });
+    return;
+  }
+
   const postId = Number.parseInt(req.params.id);
 
   if (!validateNumber(postId)) {
@@ -158,7 +188,6 @@ router.put("/blogs/:id", async (req, res) => {
   // Hämtar alla fält som ska uppdateras
   const title = req.body.title;
   const content = req.body.content;
-  const author = req.body.author;
 
   // Validerar alla fält - alla måste finnas för PUT
   if (!validateString(title)) {
@@ -175,15 +204,8 @@ router.put("/blogs/:id", async (req, res) => {
     return;
   }
 
-  if (!validateString(author)) {
-    res.status(400).json({
-      error: "Author must be included and be a string",
-    });
-    return;
-  }
-
   // Uppdaterar inlägget i databasen
-  const updated = await updateBlogPostById(postId, title, content, author);
+  const updated = await updateBlogPostById(postId, user.id, title, content);
   if (!updated) {
     res
       .status(404)
@@ -198,6 +220,14 @@ router.put("/blogs/:id", async (req, res) => {
 // PATCH används för partiella uppdateringar (bara vissa fält)
 // I det här fallet uppdaterar vi bara title, resten förblir oförändrat
 router.patch("/blogs/:id/title", async (req, res) => {
+  const user = await loginUser(req.headers.username, req.headers.password);
+  if (!user) {
+    res.status(401).json({
+      error: "The username or password is incorrect",
+    });
+    return;
+  }
+
   const postId = Number.parseInt(req.params.id);
 
   if (!validateNumber(postId)) {
@@ -215,7 +245,7 @@ router.patch("/blogs/:id/title", async (req, res) => {
   }
 
   // Uppdaterar bara titeln, content och author förblir samma
-  const updated = await updateBlogPostTitleById(postId, title);
+  const updated = await updateBlogPostTitleById(postId, user.id, title);
   if (!updated) {
     res
       .status(404)

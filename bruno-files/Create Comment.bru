@@ -1,11 +1,11 @@
 meta {
-  name: Create Blog Post
+  name: Create Comment
   type: http
-  seq: 1
+  seq: 13
 }
 
 post {
-  url: http://localhost:3000/api/blogs
+  url: http://localhost:3000/api/comments
   body: json
   auth: inherit
 }
@@ -17,8 +17,8 @@ headers {
 
 body:json {
   {
-    "title": "Inlägg 4",
-    "content": "Idag ska vi bygga ett blogg-projekt!"
+    "postId": 2,
+    "content": "Hej igen!"
   }
 }
 

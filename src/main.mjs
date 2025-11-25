@@ -3,6 +3,8 @@ import "./config/variables.mjs"; // Laddar in miljövariabler från .env-filen
 import express from "express"; // Express är ramverket vi använder för att bygga vår API
 import { setupDatabase } from "./config/database.mjs"; // Funktion som skapar våra databastabeller
 import postRoutes from "./routes/posts.mjs"; // Alla våra endpoints för blogginlägg
+import userRoutes from "./routes/users.mjs";
+import commentRoutes from "./routes/comments.mjs";
 
 // Startar databasen och skapar tabellerna om de inte finns
 setupDatabase();
@@ -21,6 +23,9 @@ app.use(express.json());
 // Detta betyder att alla endpoints i postRoutes börjar med /api
 // t.ex. /api/blogs, /api/blogs/:id osv
 app.use("/api", postRoutes);
+
+app.use("/api", userRoutes);
+app.use("/api", commentRoutes);
 
 // Startar servern och lyssnar på den angivna porten
 app.listen(appPort, () => {
